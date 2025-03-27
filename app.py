@@ -50,31 +50,36 @@ def upload_files():
     if audio_ext not in ['.mp3', '.m4a', '.wav', '.ogg']:
         return jsonify({'error': 'Unsupported audio format. Please use MP3, M4A, WAV, or OGG files.'}), 400
     
-    # Store audio data in memory
-    current_audio_data = audio_file.read()
-    current_audio_type = get_audio_mime_type(audio_file.filename)
-    
-    # Read and parse subtitle content directly from memory
-    subtitle_content = subtitle_file.read()
     try:
+        # Clear previous audio data
+        current_audio_data = None
+        current_audio_type = None
+        
+        # Store new audio data in memory
+        current_audio_data = audio_file.read()
+        current_audio_type = get_audio_mime_type(audio_file.filename)
+        
+        # Read and parse subtitle content directly from memory
+        subtitle_content = subtitle_file.read()
         subtitles = parse_srt_content(subtitle_content)
-    except Exception as e:
-        return jsonify({'error': f'Error parsing subtitle file: {str(e)}'}), 400
-    
-    # Convert subtitles to a format suitable for the frontend
-    formatted_subtitles = []
-    for sub in subtitles:
-        formatted_subtitles.append({
-            'id': sub.index,
-            'start': str(sub.start),
-            'end': str(sub.end),
-            'text': sub.content
+        
+        # Convert subtitles to a format suitable for the frontend
+        formatted_subtitles = []
+        for sub in subtitles:
+            formatted_subtitles.append({
+                'id': sub.index,
+                'start': str(sub.start),
+                'end': str(sub.end),
+                'text': sub.content
+            })
+        
+        return jsonify({
+            'subtitles': formatted_subtitles,
+            'audio_url': '/audio/current'
         })
-    
-    return jsonify({
-        'subtitles': formatted_subtitles,
-        'audio_url': '/audio/current'
-    })
+    except Exception as e:
+        print(f"Error processing files: {str(e)}")
+        return jsonify({'error': f'Error processing files: {str(e)}'}), 500
 
 @app.route('/audio/current')
 def serve_audio():
@@ -82,11 +87,21 @@ def serve_audio():
     if current_audio_data is None:
         return jsonify({'error': 'No audio file available'}), 404
     
-    return send_file(
-        io.BytesIO(current_audio_data),
-        mimetype=current_audio_type,
-        as_attachment=False
-    )
+    try:
+        response = send_file(
+            io.BytesIO(current_audio_data),
+            mimetype=current_audio_type,
+            as_attachment=False,
+            conditional=True
+        )
+        # Add headers to prevent caching
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        return response
+    except Exception as e:
+        print(f"Error serving audio: {str(e)}")
+        return jsonify({'error': 'Error serving audio file'}), 500
 
 # Required for Vercel
 app = app

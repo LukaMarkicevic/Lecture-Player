@@ -19,15 +19,27 @@
             border-radius: 12px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
-        .upload-section {
-            margin-bottom: 30px;
-            text-align: center;
+        .header-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .header-container h1 {
+            margin: 0;
+            font-size: clamp(1.5rem, 5vw, 2rem);
+        }
+        .support-button {
+            margin-left: auto;
         }
         .upload-boxes {
             display: flex;
             gap: 20px;
             justify-content: center;
             margin: 20px 0;
+            align-items: stretch;
         }
         .upload-box {
             flex: 1;
@@ -257,18 +269,6 @@
         .player-section.hidden {
             display: none;
         }
-        .header-container {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-        .header-container h1 {
-            margin: 0;
-        }
-        .support-button {
-            margin-left: 20px;
-        }
         .selected-file {
             margin-top: 10px;
             padding: 8px;
@@ -277,6 +277,36 @@
             font-size: 14px;
             word-break: break-all;
             display: none;
+        }
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            .container {
+                padding: 15px;
+            }
+            .header-container {
+                flex-direction: column;
+                align-items: center;
+                text-align: center;
+            }
+            .support-button {
+                margin-left: 0;
+            }
+            .upload-boxes {
+                flex-direction: column;
+                align-items: center;
+            }
+            .upload-box {
+                width: 100%;
+            }
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .grouping-control {
+                justify-content: center;
+            }
         }
     </style>
 </head>
@@ -400,8 +430,8 @@
             const audioFile = document.getElementById('audio').files[0];
             const subtitleFile = document.getElementById('subtitle').files[0];
             
-            console.log('Upload button clicked');
-            console.log('Files to upload:', {
+            console.log('Start button clicked');
+            console.log('Files selected:', {
                 audio: audioFile ? audioFile.name : 'none',
                 subtitle: subtitleFile ? subtitleFile.name : 'none'
             });
@@ -411,14 +441,22 @@
                 return;
             }
 
+            // Reset audio player
+            audioPlayer.pause();
+            audioPlayer.currentTime = 0;
+            audioPlayer.src = '';
+            
             const formData = new FormData();
             formData.append('audio', audioFile);
             formData.append('subtitle', subtitleFile);
 
             try {
-                // Hide the info and warning messages
-                document.querySelector('.info-message').style.display = 'none';
-                document.querySelector('.warning-message').style.display = 'none';
+                // Hide the info and warning messages safely
+                const infoMessage = document.querySelector('.info-message');
+                const warningMessage = document.querySelector('.warning-message');
+                
+                if (infoMessage) infoMessage.style.display = 'none';
+                if (warningMessage) warningMessage.style.display = 'none';
                 
                 console.log('Sending request to server...');
                 const response = await fetch('/upload', {
@@ -438,7 +476,8 @@
                 subtitles = data.subtitles;
                 console.log('Subtitles loaded:', subtitles.length);
                 
-                audioPlayer.src = data.audio_url;
+                // Set new audio source
+                audioPlayer.src = data.audio_url + '?t=' + new Date().getTime(); // Add timestamp to prevent caching
                 console.log('Audio source set:', data.audio_url);
                 
                 // Show player section and scroll to it
@@ -449,8 +488,22 @@
                 audioPlayer.load();
                 console.log('Audio player loaded');
                 
-                audioPlayer.play().catch(error => {
-                    console.log('Auto-play prevented:', error);
+                // Add error handling for audio loading
+                audioPlayer.addEventListener('loadeddata', () => {
+                    console.log('Audio data loaded successfully');
+                    audioPlayer.play().catch(error => {
+                        console.log('Auto-play prevented:', error);
+                        // Show a message to the user about auto-play being blocked
+                        alert('Audio loaded but auto-play was blocked. Please click the play button to start playback.');
+                    });
+                });
+
+                audioPlayer.addEventListener('error', (e) => {
+                    console.error('Audio player error:', e);
+                    const errorMessage = audioPlayer.error ? 
+                        `Error loading audio: ${audioPlayer.error.message}` : 
+                        'Error loading audio file. Please try again.';
+                    alert(errorMessage);
                 });
                 
                 renderSubtitles();
@@ -543,12 +596,6 @@
                 const currentTime = audioPlayer.currentTime;
                 updateActiveSubtitle(currentTime);
             });
-
-            // Add error handling for audio player
-            audioPlayer.addEventListener('error', (e) => {
-                console.error('Audio player error:', e);
-                alert('Error loading audio file. Please try again.');
-            });
         }
 
         // Update the updateActiveSubtitle function to handle grouped subtitles
@@ -561,8 +608,9 @@
             const currentGroupIndex = Array.from(subtitleElements).findIndex(el => {
                 const start = timeToSeconds(el.querySelector('.timestamp').textContent);
                 const text = el.querySelector('.text').textContent;
-                const groupEndIndex = subtitles.findIndex(s => s.text === text.split(' ')[text.split(' ').length - 1]);
-                const end = timeToSeconds(subtitles[groupEndIndex]?.end || subtitles[subtitles.length - 1].end);
+                // Find the last subtitle in this group by matching the last part of the text
+                const lastSubtitle = subtitles.find(s => text.endsWith(s.text));
+                const end = timeToSeconds(lastSubtitle?.end || subtitles[subtitles.length - 1].end);
                 return currentTime >= start && currentTime <= end;
             });
 
