@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Player with Subtitles</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .upload-section {
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        .upload-boxes {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin: 20px 0;
+        }
+        .upload-box {
+            flex: 1;
+            max-width: 400px;
+            padding: 20px;
+            border-radius: 12px;
+            background-color: white;
+            border: 3px solid;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .upload-box:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        .upload-box.audio {
+            border-color: #2196f3;
+        }
+        .upload-box.subtitle {
+            border-color: #4caf50;
+        }
+        .upload-box input[type="file"] {
+            display: none;
+        }
+        .upload-box label {
+            display: block;
+            cursor: pointer;
+        }
+        .upload-box .icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+        .upload-box .title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .upload-box .description {
+            color: #666;
+            font-size: 14px;
+        }
+        .player-section {
+            margin-bottom: 20px;
+        }
+        audio {
+            width: 100%;
+            margin-bottom: 20px;
+            border-radius: 8px;
+        }
+        .subtitle-container {
+            max-height: 400px;
+            overflow-y: auto;
+            padding: 15px;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            background-color: #fafafa;
+        }
+        .subtitle-item {
+            padding: 12px;
+            margin: 8px 0;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            background-color: white;
+            border: 1px solid #eee;
+        }
+        .subtitle-item:hover {
+            background-color: #f0f0f0;
+            transform: translateX(5px);
+        }
+        .subtitle-item.active {
+            background-color: #e3f2fd;
+            border-color: #2196f3;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            justify-content: center;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            background-color: #2196f3;
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: bold;
+        }
+        button:hover {
+            background-color: #1976d2;
+            transform: translateY(-2px);
+        }
+        .info-message {
+            background-color: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+            color: #1976d2;
+        }
+        .info-message strong {
+            color: #1565c0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Audio Player with Subtitles</h1>
+        
+        <div class="info-message">
+            <strong>Local File Handling:</strong> All files are processed locally on your device. No files are uploaded to any server. 
+            Files are temporarily stored in your browser's memory and are cleared when you close the page.
+        </div>
+
+        <div class="upload-section">
+            <h2>Upload Files</h2>
+            <div class="upload-boxes">
+                <div class="upload-box audio">
+                    <label for="audio">
+                        <div class="icon">🎙️</div>
+                        <div class="title">Audio File</div>
+                        <div class="description">Upload your MP3 file</div>
+                    </label>
+                    <input type="file" id="audio" name="audio" accept=".mp3" required>
+                </div>
+                
+                <div class="upload-box subtitle">
+                    <label for="subtitle">
+                        <div class="icon">📝</div>
+                        <div class="title">Subtitle File</div>
+                        <div class="description">Upload your SRT file</div>
+                    </label>
+                    <input type="file" id="subtitle" name="subtitle" accept=".srt" required>
+                </div>
+            </div>
+            <button type="submit" id="uploadButton" style="margin-top: 20px;">Start Playing</button>
+        </div>
+
+        <div class="player-section" style="display: none;">
+            <audio id="audioPlayer" controls></audio>
+            
+            <div class="controls">
+                <button onclick="seekBackward(5)">⏪ -5s</button>
+                <button onclick="seekForward(5)">+5s ⏩</button>
+            </div>
+
+            <div class="subtitle-container" id="subtitleContainer"></div>
+        </div>
+    </div>
+
+    <script>
+        let subtitles = [];
+        let currentSubtitleIndex = -1;
+        const audioPlayer = document.getElementById('audioPlayer');
+        const subtitleContainer = document.getElementById('subtitleContainer');
+        const playerSection = document.querySelector('.player-section');
+        const uploadButton = document.getElementById('uploadButton');
+
+        // Update button state based on file selection
+        function updateUploadButton() {
+            const audioFile = document.getElementById('audio').files[0];
+            const subtitleFile = document.getElementById('subtitle').files[0];
+            uploadButton.disabled = !(audioFile && subtitleFile);
+            uploadButton.style.opacity = uploadButton.disabled ? '0.5' : '1';
+        }
+
+        document.getElementById('audio').addEventListener('change', updateUploadButton);
+        document.getElementById('subtitle').addEventListener('change', updateUploadButton);
+
+        uploadButton.addEventListener('click', async () => {
+            const formData = new FormData();
+            formData.append('audio', document.getElementById('audio').files[0]);
+            formData.append('subtitle', document.getElementById('subtitle').files[0]);
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+
+                subtitles = data.subtitles;
+                audioPlayer.src = data.audio_url;
+                playerSection.style.display = 'block';
+                renderSubtitles();
+                setupAudioListeners();
+            } catch (error) {
+                alert('Error processing files');
+                console.error(error);
+            }
+        });
+
+        function renderSubtitles() {
+            subtitleContainer.innerHTML = '';
+            subtitles.forEach((sub, index) => {
+                const div = document.createElement('div');
+                div.className = 'subtitle-item';
+                div.textContent = sub.text;
+                div.onclick = () => seekToSubtitle(index);
+                subtitleContainer.appendChild(div);
+            });
+        }
+
+        function setupAudioListeners() {
+            audioPlayer.addEventListener('timeupdate', () => {
+                const currentTime = audioPlayer.currentTime;
+                updateActiveSubtitle(currentTime);
+            });
+        }
+
+        function updateActiveSubtitle(currentTime) {
+            const subtitleElements = subtitleContainer.children;
+            
+            Array.from(subtitleElements).forEach(el => el.classList.remove('active'));
+            
+            const currentSub = subtitles.findIndex(sub => {
+                const start = timeToSeconds(sub.start);
+                const end = timeToSeconds(sub.end);
+                return currentTime >= start && currentTime <= end;
+            });
+
+            if (currentSub !== -1 && currentSub !== currentSubtitleIndex) {
+                currentSubtitleIndex = currentSub;
+                subtitleElements[currentSub].classList.add('active');
+                subtitleElements[currentSub].scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+
+        function timeToSeconds(timeStr) {
+            const [hours, minutes, seconds] = timeStr.split(':');
+            const [secs, ms] = seconds.split(',');
+            return parseInt(hours) * 3600 + parseInt(minutes) * 60 + parseInt(secs) + parseInt(ms) / 1000;
+        }
+
+        function seekToSubtitle(index) {
+            const startTime = timeToSeconds(subtitles[index].start);
+            audioPlayer.currentTime = startTime;
+            audioPlayer.play();
+        }
+
+        function seekForward(seconds) {
+            audioPlayer.currentTime = Math.min(audioPlayer.duration, audioPlayer.currentTime + seconds);
+        }
+
+        function seekBackward(seconds) {
+            audioPlayer.currentTime = Math.max(0, audioPlayer.currentTime - seconds);
+        }
+    </script>
+</body>
+</html> 
