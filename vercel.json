@@ -10,6 +10,21 @@
         {
             "src": "/(.*)",
             "dest": "app.py"
+        },
+        {
+            "src": "/upload",
+            "methods": ["POST"],
+            "headers": {
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Headers": "Origin, X-Requested-With, Content-Type, Accept"
+            },
+            "continue": true
         }
-    ]
+    ],
+    "functions": {
+        "api/*.py": {
+            "memory": 1024,
+            "maxDuration": 10
+        }
+    }
 } 

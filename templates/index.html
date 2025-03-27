@@ -387,6 +387,7 @@
         const toggleFilesBtn = document.getElementById('toggleFilesBtn');
         let groupingSeconds = 1;
         const groupingInput = document.getElementById('groupingSeconds');
+        let currentAudioUrl = null; // Store the current audio URL
 
         // Update button state based on file selection
         function updateUploadButton() {
@@ -441,15 +442,14 @@
                 return;
             }
 
-            // Reset audio player
+            // Reset audio player and clean up previous URL
             audioPlayer.pause();
             audioPlayer.currentTime = 0;
-            audioPlayer.src = '';
+            if (currentAudioUrl) {
+                URL.revokeObjectURL(currentAudioUrl);
+                currentAudioUrl = null;
+            }
             
-            const formData = new FormData();
-            formData.append('audio', audioFile);
-            formData.append('subtitle', subtitleFile);
-
             try {
                 // Hide the info and warning messages safely
                 const infoMessage = document.querySelector('.info-message');
@@ -458,53 +458,74 @@
                 if (infoMessage) infoMessage.style.display = 'none';
                 if (warningMessage) warningMessage.style.display = 'none';
                 
-                console.log('Sending request to server...');
-                const response = await fetch('/upload', {
-                    method: 'POST',
-                    body: formData
-                });
+                // Read subtitle file
+                const subtitleContent = await subtitleFile.text();
+                const subtitleLines = subtitleContent.split('\n');
+                subtitles = [];
+                let currentSubtitle = {};
                 
-                console.log('Response received:', response.status);
-                const data = await response.json();
-                console.log('Response data:', data);
-
-                if (data.error) {
-                    alert(data.error);
-                    return;
+                for (let i = 0; i < subtitleLines.length; i++) {
+                    const line = subtitleLines[i].trim();
+                    if (line === '') continue;
+                    
+                    if (line.match(/^\d+$/)) {
+                        if (Object.keys(currentSubtitle).length > 0) {
+                            subtitles.push(currentSubtitle);
+                        }
+                        currentSubtitle = { id: parseInt(line) };
+                    } else if (line.includes('-->')) {
+                        const [start, end] = line.split('-->').map(t => t.trim());
+                        currentSubtitle.start = start;
+                        currentSubtitle.end = end;
+                    } else {
+                        currentSubtitle.text = (currentSubtitle.text || '') + line + ' ';
+                    }
                 }
-
-                subtitles = data.subtitles;
+                
+                if (Object.keys(currentSubtitle).length > 0) {
+                    subtitles.push(currentSubtitle);
+                }
+                
                 console.log('Subtitles loaded:', subtitles.length);
                 
-                // Set new audio source
-                audioPlayer.src = data.audio_url + '?t=' + new Date().getTime(); // Add timestamp to prevent caching
-                console.log('Audio source set:', data.audio_url);
+                // Create and set audio URL
+                currentAudioUrl = URL.createObjectURL(audioFile);
+                audioPlayer.src = currentAudioUrl;
+                console.log('Audio source set from local file');
                 
                 // Show player section and scroll to it
                 playerSection.style.display = 'block';
                 playerSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 
                 // Initialize audio player
-                audioPlayer.load();
-                console.log('Audio player loaded');
+                await new Promise((resolve, reject) => {
+                    const handleCanPlay = () => {
+                        audioPlayer.removeEventListener('canplay', handleCanPlay);
+                        audioPlayer.removeEventListener('error', handleError);
+                        resolve();
+                    };
+                    
+                    const handleError = (e) => {
+                        audioPlayer.removeEventListener('canplay', handleCanPlay);
+                        audioPlayer.removeEventListener('error', handleError);
+                        reject(new Error('Failed to load audio file'));
+                    };
+                    
+                    audioPlayer.addEventListener('canplay', handleCanPlay);
+                    audioPlayer.addEventListener('error', handleError);
+                    
+                    audioPlayer.load();
+                });
                 
-                // Add error handling for audio loading
-                audioPlayer.addEventListener('loadeddata', () => {
-                    console.log('Audio data loaded successfully');
-                    audioPlayer.play().catch(error => {
-                        console.log('Auto-play prevented:', error);
-                        // Show a message to the user about auto-play being blocked
-                        alert('Audio loaded but auto-play was blocked. Please click the play button to start playback.');
-                    });
-                });
-
-                audioPlayer.addEventListener('error', (e) => {
-                    console.error('Audio player error:', e);
-                    const errorMessage = audioPlayer.error ? 
-                        `Error loading audio: ${audioPlayer.error.message}` : 
-                        'Error loading audio file. Please try again.';
-                    alert(errorMessage);
-                });
+                console.log('Audio player loaded successfully');
+                
+                // Try to play the audio
+                try {
+                    await audioPlayer.play();
+                } catch (error) {
+                    console.log('Auto-play prevented:', error);
+                    alert('Audio loaded but auto-play was blocked. Please click the play button to start playback.');
+                }
                 
                 renderSubtitles();
                 setupAudioListeners();
@@ -524,6 +545,25 @@
             groupingInput.value = groupingSeconds;
             renderSubtitles();
         });
+
+        function formatTime(timeStr) {
+            try {
+                // Handle SRT format (00:00:00,000)
+                const [hours, minutes, seconds] = timeStr.split(':');
+                const [secs] = seconds.split(',');
+                
+                // Convert all parts to numbers
+                const h = parseInt(hours) || 0;
+                const m = parseInt(minutes) || 0;
+                const s = parseInt(secs) || 0;
+                
+                // Format as HH:MM:SS
+                return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+            } catch (error) {
+                console.error('Error formatting time:', timeStr, error);
+                return timeStr;
+            }
+        }
 
         function renderSubtitles() {
             subtitleContainer.innerHTML = '';
@@ -576,7 +616,7 @@
                 
                 const timeSpan = document.createElement('span');
                 timeSpan.className = 'timestamp';
-                timeSpan.textContent = group.start;
+                timeSpan.textContent = formatTime(group.start);
                 
                 div.appendChild(textSpan);
                 div.appendChild(timeSpan);
