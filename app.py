@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, jsonify, send_file
 import srt
 import os
 from datetime import datetime, timedelta
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 
@@ -31,15 +32,19 @@ def upload_files():
     if audio_file.filename == '' or subtitle_file.filename == '':
         return jsonify({'error': 'No selected files'}), 400
     
-    # Save files temporarily
-    current_audio = 'temp_audio.mp3'
-    current_srt = 'temp_subtitle.srt'
+    # Save files temporarily with secure filenames
+    current_audio = secure_filename(audio_file.filename)
+    current_srt = secure_filename(subtitle_file.filename)
     
-    audio_file.save(current_audio)
-    subtitle_file.save(current_srt)
+    # Save files to /tmp directory (required for Vercel)
+    audio_path = os.path.join('/tmp', current_audio)
+    srt_path = os.path.join('/tmp', current_srt)
+    
+    audio_file.save(audio_path)
+    subtitle_file.save(srt_path)
     
     # Parse subtitles
-    subtitles = parse_srt(current_srt)
+    subtitles = parse_srt(srt_path)
     
     # Convert subtitles to a format suitable for the frontend
     formatted_subtitles = []
@@ -53,14 +58,18 @@ def upload_files():
     
     return jsonify({
         'subtitles': formatted_subtitles,
-        'audio_url': '/audio'
+        'audio_url': f'/audio/{current_audio}'
     })
 
-@app.route('/audio')
-def serve_audio():
-    if current_audio and os.path.exists(current_audio):
-        return send_file(current_audio, mimetype='audio/mpeg')
+@app.route('/audio/<filename>')
+def serve_audio(filename):
+    audio_path = os.path.join('/tmp', secure_filename(filename))
+    if os.path.exists(audio_path):
+        return send_file(audio_path, mimetype='audio/mpeg')
     return jsonify({'error': 'No audio file available'}), 404
+
+# Required for Vercel
+app = app
 
 if __name__ == '__main__':
     app.run(debug=True) 
