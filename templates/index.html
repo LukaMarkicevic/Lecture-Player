@@ -35,9 +35,10 @@
             padding: 20px;
             border-radius: 12px;
             background-color: white;
-            border: 3px solid;
+            border: 3px solid #2196f3;
             transition: all 0.3s ease;
             cursor: pointer;
+            text-align: center;
         }
         .upload-box:hover {
             transform: translateY(-5px);
@@ -60,14 +61,14 @@
             font-size: 48px;
             margin-bottom: 10px;
         }
-        .upload-box .title {
+        .upload-box h3 {
             font-size: 18px;
-            font-weight: bold;
-            margin-bottom: 10px;
+            margin: 10px 0;
         }
-        .upload-box .description {
+        .upload-box p {
             color: #666;
             font-size: 14px;
+            margin: 10px 0;
         }
         .player-section {
             margin-bottom: 20px;
@@ -165,8 +166,49 @@
             border-radius: 4px;
             color: #1976d2;
         }
-        .info-message strong {
-            color: #1565c0;
+        .warning-message {
+            background-color: #fff3e0;
+            border-left: 4px solid #ff9800;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+            color: #f57c00;
+        }
+        .close-btn {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            opacity: 0.6;
+            font-size: 18px;
+            background: none;
+            border: none;
+            padding: 5px;
+        }
+        .close-btn:hover {
+            opacity: 1;
+        }
+        .start-button-container {
+            display: flex;
+            justify-content: center;
+            margin: 30px 0 40px 0;
+        }
+        #startButton {
+            font-size: 18px;
+            padding: 15px 30px;
+            background: linear-gradient(45deg, #2196f3, #1976d2);
+            box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3);
+            transform-origin: center;
+        }
+        #startButton:hover {
+            transform: scale(1.05) translateY(-2px);
+            box-shadow: 0 6px 20px rgba(33, 150, 243, 0.4);
+        }
+        #startButton:disabled {
+            background: linear-gradient(45deg, #9e9e9e, #757575);
+            box-shadow: none;
+            transform: none;
         }
         .title-icon {
             width: 32px;
@@ -227,6 +269,15 @@
         .support-button {
             margin-left: 20px;
         }
+        .selected-file {
+            margin-top: 10px;
+            padding: 8px;
+            background-color: #e3f2fd;
+            border-radius: 4px;
+            font-size: 14px;
+            word-break: break-all;
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -239,46 +290,37 @@
         </div>
         
         <div class="info-message">
-            <strong>Local File Handling:</strong> All files are processed locally on your device. No files are uploaded to any server. 
-            Files are temporarily stored in your browser's memory and are cleared when you close the page.
+            <strong>Local File Handling:</strong> All files are processed locally on your device. Files are temporarily stored in your browser's memory and are cleared when you close the page.
+            <button class="close-btn" onclick="this.parentElement.style.display='none'">×</button>
         </div>
 
-        <div class="upload-section" id="uploadSection">
-            <h2>Upload Files</h2>
+        <div class="file-section" id="fileSection">
+            <h2>Select Files</h2>
             <div class="upload-boxes">
-                <div class="upload-box audio">
+                <div class="upload-box">
                     <label for="audio">
                         <div class="icon">🎙️</div>
-                        <div class="title">Audio File</div>
-                        <div class="description">Upload your audio file (MP3, M4A, WAV, OGG)</div>
+                        <h3>Audio File</h3>
+                        <p>Select your audio file (MP3, M4A, WAV, OGG)</p>
+                        <div id="audioFileName" class="selected-file"></div>
+                        <input type="file" id="audio" accept=".mp3,.m4a,.wav,.ogg">
                     </label>
-                    <input type="file" id="audio" name="audio" accept=".mp3,.m4a,.wav,.ogg" required>
                 </div>
-                
-                <div class="upload-box subtitle">
+                <div class="upload-box">
                     <label for="subtitle">
                         <div class="icon">📝</div>
-                        <div class="title">Subtitle File</div>
-                        <div class="description">Upload your SRT file</div>
+                        <h3>Subtitle File</h3>
+                        <p>Select your SRT file</p>
+                        <div id="subtitleFileName" class="selected-file"></div>
+                        <input type="file" id="subtitle" accept=".srt">
                     </label>
-                    <input type="file" id="subtitle" name="subtitle" accept=".srt" required>
                 </div>
             </div>
-            <div class="uploaded-files" id="uploadedFiles">
-                <div class="file-info">
-                    <span class="icon">🎙️</span>
-                    <span class="name" id="audioFileName"></span>
-                    <span class="size" id="audioFileSize"></span>
-                </div>
-                <div class="file-info">
-                    <span class="icon">📝</span>
-                    <span class="name" id="subtitleFileName"></span>
-                    <span class="size" id="subtitleFileSize"></span>
-                </div>
+            <div class="start-button-container">
+                <button type="submit" id="startButton">
+                    <img src="/static/icon.svg" alt="Icon" class="button-icon">Start Playing
+                </button>
             </div>
-            <button type="submit" id="uploadButton" style="margin-top: 20px;">
-                <img src="/static/icon.svg" alt="Icon" class="button-icon">Start Playing
-            </button>
         </div>
 
         <div class="player-section" style="display: none;">
@@ -293,8 +335,8 @@
                     <input type="number" id="groupingSeconds" min="1" max="60" value="1">
                     <span>seconds</span>
                 </div>
-                <button id="togglePlayerBtn">
-                    <span>▼</span>
+                <button id="toggleFilesBtn">
+                    <span>▲</span>
                 </button>
             </div>
 
@@ -308,11 +350,11 @@
         const audioPlayer = document.getElementById('audioPlayer');
         const subtitleContainer = document.getElementById('subtitleContainer');
         const playerSection = document.querySelector('.player-section');
-        const uploadButton = document.getElementById('uploadButton');
-        const uploadSection = document.getElementById('uploadSection');
+        const startButton = document.getElementById('startButton');
+        const fileSection = document.getElementById('fileSection');
         let isFollowingText = false;
         const followTextBtn = document.getElementById('followTextBtn');
-        const togglePlayerBtn = document.getElementById('togglePlayerBtn');
+        const toggleFilesBtn = document.getElementById('toggleFilesBtn');
         let groupingSeconds = 1;
         const groupingInput = document.getElementById('groupingSeconds');
 
@@ -320,40 +362,27 @@
         function updateUploadButton() {
             const audioFile = document.getElementById('audio').files[0];
             const subtitleFile = document.getElementById('subtitle').files[0];
-            const uploadedFiles = document.getElementById('uploadedFiles');
+            const audioFileName = document.getElementById('audioFileName');
+            const subtitleFileName = document.getElementById('subtitleFileName');
             
-            console.log('Files selected:', {
-                audio: audioFile ? audioFile.name : 'none',
-                subtitle: subtitleFile ? subtitleFile.name : 'none'
-            });
-            
-            uploadButton.disabled = !(audioFile && subtitleFile);
-            uploadButton.style.opacity = uploadButton.disabled ? '0.5' : '1';
-            
-            // Show uploaded files section if either file is selected
-            if (audioFile || subtitleFile) {
-                uploadedFiles.classList.add('show');
-                
-                // Update audio file info if present
-                if (audioFile) {
-                    document.getElementById('audioFileName').textContent = audioFile.name;
-                    document.getElementById('audioFileSize').textContent = formatFileSize(audioFile.size);
-                } else {
-                    document.getElementById('audioFileName').textContent = 'No audio file selected';
-                    document.getElementById('audioFileSize').textContent = '';
-                }
-                
-                // Update subtitle file info if present
-                if (subtitleFile) {
-                    document.getElementById('subtitleFileName').textContent = subtitleFile.name;
-                    document.getElementById('subtitleFileSize').textContent = formatFileSize(subtitleFile.size);
-                } else {
-                    document.getElementById('subtitleFileName').textContent = 'No subtitle file selected';
-                    document.getElementById('subtitleFileSize').textContent = '';
-                }
+            // Update audio file info
+            if (audioFile) {
+                audioFileName.textContent = audioFile.name;
+                audioFileName.style.display = 'block';
             } else {
-                uploadedFiles.classList.remove('show');
+                audioFileName.style.display = 'none';
             }
+            
+            // Update subtitle file info
+            if (subtitleFile) {
+                subtitleFileName.textContent = subtitleFile.name;
+                subtitleFileName.style.display = 'block';
+            } else {
+                subtitleFileName.style.display = 'none';
+            }
+            
+            startButton.disabled = !(audioFile && subtitleFile);
+            startButton.style.opacity = startButton.disabled ? '0.5' : '1';
         }
 
         function formatFileSize(bytes) {
@@ -367,7 +396,7 @@
         document.getElementById('audio').addEventListener('change', updateUploadButton);
         document.getElementById('subtitle').addEventListener('change', updateUploadButton);
 
-        uploadButton.addEventListener('click', async () => {
+        startButton.addEventListener('click', async () => {
             const audioFile = document.getElementById('audio').files[0];
             const subtitleFile = document.getElementById('subtitle').files[0];
             
@@ -387,6 +416,10 @@
             formData.append('subtitle', subtitleFile);
 
             try {
+                // Hide the info and warning messages
+                document.querySelector('.info-message').style.display = 'none';
+                document.querySelector('.warning-message').style.display = 'none';
+                
                 console.log('Sending request to server...');
                 const response = await fetch('/upload', {
                     method: 'POST',
@@ -423,8 +456,9 @@
                 renderSubtitles();
                 setupAudioListeners();
                 
-                // Hide upload section
-                uploadSection.classList.add('hidden');
+                // Hide file section
+                fileSection.style.display = 'none';
+                toggleFilesBtn.querySelector('span').textContent = '▼';
             } catch (error) {
                 console.error('Error processing files:', error);
                 alert('Error processing files: ' + error.message);
@@ -524,14 +558,18 @@
             Array.from(subtitleElements).forEach(el => el.classList.remove('active'));
             
             // Find the group that contains the current time
-            const currentGroup = subtitleElements[Array.from(subtitleElements).findIndex(el => {
+            const currentGroupIndex = Array.from(subtitleElements).findIndex(el => {
                 const start = timeToSeconds(el.querySelector('.timestamp').textContent);
-                const end = timeToSeconds(subtitles[subtitles.length - 1].end);
+                const text = el.querySelector('.text').textContent;
+                const groupEndIndex = subtitles.findIndex(s => s.text === text.split(' ')[text.split(' ').length - 1]);
+                const end = timeToSeconds(subtitles[groupEndIndex]?.end || subtitles[subtitles.length - 1].end);
                 return currentTime >= start && currentTime <= end;
-            })];
-            
-            if (currentGroup) {
+            });
+
+            if (currentGroupIndex !== -1) {
+                const currentGroup = subtitleElements[currentGroupIndex];
                 currentGroup.classList.add('active');
+                currentSubtitleIndex = currentGroupIndex;
                 
                 // Scroll to active subtitle if following text is enabled
                 if (isFollowingText) {
@@ -598,20 +636,17 @@
         });
 
         // Update the toggle button click handler
-        togglePlayerBtn.addEventListener('click', () => {
-            const toggleIcon = togglePlayerBtn.querySelector('span');
+        toggleFilesBtn.addEventListener('click', () => {
+            const toggleIcon = toggleFilesBtn.querySelector('span');
             
-            if (uploadSection.classList.contains('hidden')) {
-                uploadSection.classList.remove('hidden');
-                toggleIcon.textContent = '▼';
-            } else {
-                uploadSection.classList.add('hidden');
+            if (fileSection.style.display === 'none') {
+                fileSection.style.display = 'block';
                 toggleIcon.textContent = '▲';
+            } else {
+                fileSection.style.display = 'none';
+                toggleIcon.textContent = '▼';
             }
         });
-
-        // Remove the old toggle button event listener and element
-        document.querySelector('.toggle-upload')?.remove();
     </script>
 </body>
 </html> 
