@@ -248,65 +248,6 @@
             display: flex;
             align-items: center;
             gap: 10px;
-            margin: 5px 0;
-            padding: 8px;
-            background-color: white;
-            border-radius: 4px;
-            border: 1px solid #e0e0e0;
-        }
-        .file-info .icon {
-            font-size: 20px;
-        }
-        .file-info .name {
-            flex: 1;
-            font-size: 14px;
-            color: #333;
-        }
-        .file-info .size {
-            font-size: 12px;
-            color: #666;
-        }
-        .player-section.hidden {
-            display: none;
-        }
-        .selected-file {
-            margin-top: 10px;
-            padding: 8px;
-            background-color: #e3f2fd;
-            border-radius: 4px;
-            font-size: 14px;
-            word-break: break-all;
-            display: none;
-        }
-        @media (max-width: 768px) {
-            body {
-                padding: 10px;
-            }
-            .container {
-                padding: 15px;
-            }
-            .header-container {
-                flex-direction: column;
-                align-items: center;
-                text-align: center;
-            }
-            .support-button {
-                margin-left: 0;
-            }
-            .upload-boxes {
-                flex-direction: column;
-                align-items: center;
-            }
-            .upload-box {
-                width: 100%;
-            }
-            .controls {
-                flex-direction: column;
-                align-items: stretch;
-            }
-            .grouping-control {
-                justify-content: center;
-            }
         }
     </style>
 </head>
@@ -347,8 +288,8 @@
                 </div>
             </div>
             <div class="start-button-container">
-                <button type="submit" id="startButton">
-                    <img src="/static/icon.svg" alt="Icon" class="button-icon">Start Playing
+                <button type="submit" id="startButton" disabled>
+                    Start Playing
                 </button>
             </div>
         </div>
@@ -387,7 +328,6 @@
         const toggleFilesBtn = document.getElementById('toggleFilesBtn');
         let groupingSeconds = 1;
         const groupingInput = document.getElementById('groupingSeconds');
-        let currentAudioUrl = null; // Store the current audio URL
 
         // Update button state based on file selection
         function updateUploadButton() {
@@ -396,7 +336,6 @@
             const audioFileName = document.getElementById('audioFileName');
             const subtitleFileName = document.getElementById('subtitleFileName');
             
-            // Update audio file info
             if (audioFile) {
                 audioFileName.textContent = audioFile.name;
                 audioFileName.style.display = 'block';
@@ -404,7 +343,6 @@
                 audioFileName.style.display = 'none';
             }
             
-            // Update subtitle file info
             if (subtitleFile) {
                 subtitleFileName.textContent = subtitleFile.name;
                 subtitleFileName.style.display = 'block';
@@ -416,181 +354,144 @@
             startButton.style.opacity = startButton.disabled ? '0.5' : '1';
         }
 
-        function formatFileSize(bytes) {
-            if (bytes === 0) return '0 Bytes';
-            const k = 1024;
-            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-        }
-
+        // Handle file uploads
         document.getElementById('audio').addEventListener('change', updateUploadButton);
-        document.getElementById('subtitle').addEventListener('change', updateUploadButton);
+        document.getElementById('subtitle').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
 
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    subtitles = parseSRT(event.target.result);
+                    updateUploadButton();
+                } catch (error) {
+                    console.error('Error parsing SRT:', error);
+                    alert('Error parsing subtitle file. Please make sure it\'s a valid SRT file.');
+                }
+            };
+            reader.readAsText(file);
+        });
+
+        // Start button click handler
         startButton.addEventListener('click', async () => {
             const audioFile = document.getElementById('audio').files[0];
-            const subtitleFile = document.getElementById('subtitle').files[0];
+            if (!audioFile) return;
             
-            console.log('Start button clicked');
-            console.log('Files selected:', {
-                audio: audioFile ? audioFile.name : 'none',
-                subtitle: subtitleFile ? subtitleFile.name : 'none'
-            });
+            const audioURL = URL.createObjectURL(audioFile);
+            audioPlayer.src = audioURL;
+            
+            playerSection.style.display = 'block';
+            playerSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            
+            fileSection.style.display = 'none';
+            toggleFilesBtn.querySelector('span').textContent = '▼';
+            
+            if (subtitles && subtitles.length > 0) {
+                renderSubtitles();
+                setupAudioListeners();
+                // Start playing automatically
+                audioPlayer.play().catch(error => {
+                    console.log('Autoplay prevented:', error);
+                });
+            }
+        });
 
-            if (!audioFile || !subtitleFile) {
-                alert('Please select both audio and subtitle files');
+        // Parse SRT content
+        function parseSRT(content) {
+            const lines = content.split('\n');
+            const subtitles = [];
+            let currentSubtitle = null;
+
+            for (let line of lines) {
+                line = line.trim();
+                if (!line) {
+                    if (currentSubtitle && currentSubtitle.text) {
+                        currentSubtitle.text = currentSubtitle.text.trim();
+                        subtitles.push(currentSubtitle);
+                        currentSubtitle = null;
+                    }
+                    continue;
+                }
+
+                if (line.match(/^\d+$/)) {
+                    if (currentSubtitle && currentSubtitle.text) {
+                        currentSubtitle.text = currentSubtitle.text.trim();
+                        subtitles.push(currentSubtitle);
+                    }
+                    currentSubtitle = {
+                        id: parseInt(line),
+                        start: '',
+                        end: '',
+                        text: ''
+                    };
+                } else if (line.includes('-->') && currentSubtitle) {
+                    const [start, end] = line.split('-->').map(t => t.trim());
+                    currentSubtitle.start = start;
+                    currentSubtitle.end = end;
+                } else if (currentSubtitle) {
+                    currentSubtitle.text = (currentSubtitle.text + ' ' + line).trim();
+                }
+            }
+
+            if (currentSubtitle && currentSubtitle.text) {
+                currentSubtitle.text = currentSubtitle.text.trim();
+                subtitles.push(currentSubtitle);
+            }
+
+            return subtitles;
+        }
+
+        // Convert time string to seconds
+        function timeToSeconds(timeStr) {
+            const [hours, minutes, seconds] = timeStr.split(':');
+            const [secs, ms] = seconds.split(',');
+            return parseInt(hours) * 3600 + parseInt(minutes) * 60 + parseInt(secs) + parseInt(ms) / 1000;
+        }
+
+        // Convert seconds to time string
+        function secondsToTime(seconds) {
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        // Update subtitles display
+        function renderSubtitles() {
+            const container = document.getElementById('subtitleContainer');
+            container.innerHTML = '';
+            
+            if (!subtitles || subtitles.length === 0) {
                 return;
             }
 
-            // Reset audio player and clean up previous URL
-            audioPlayer.pause();
-            audioPlayer.currentTime = 0;
-            if (currentAudioUrl) {
-                URL.revokeObjectURL(currentAudioUrl);
-                currentAudioUrl = null;
-            }
-            
-            try {
-                // Hide the info and warning messages safely
-                const infoMessage = document.querySelector('.info-message');
-                const warningMessage = document.querySelector('.warning-message');
-                
-                if (infoMessage) infoMessage.style.display = 'none';
-                if (warningMessage) warningMessage.style.display = 'none';
-                
-                // Read subtitle file
-                const subtitleContent = await subtitleFile.text();
-                const subtitleLines = subtitleContent.split('\n');
-                subtitles = [];
-                let currentSubtitle = {};
-                
-                for (let i = 0; i < subtitleLines.length; i++) {
-                    const line = subtitleLines[i].trim();
-                    if (line === '') continue;
-                    
-                    if (line.match(/^\d+$/)) {
-                        if (Object.keys(currentSubtitle).length > 0) {
-                            subtitles.push(currentSubtitle);
-                        }
-                        currentSubtitle = { id: parseInt(line) };
-                    } else if (line.includes('-->')) {
-                        const [start, end] = line.split('-->').map(t => t.trim());
-                        currentSubtitle.start = start;
-                        currentSubtitle.end = end;
-                    } else {
-                        currentSubtitle.text = (currentSubtitle.text || '') + line + ' ';
-                    }
-                }
-                
-                if (Object.keys(currentSubtitle).length > 0) {
-                    subtitles.push(currentSubtitle);
-                }
-                
-                console.log('Subtitles loaded:', subtitles.length);
-                
-                // Create and set audio URL
-                currentAudioUrl = URL.createObjectURL(audioFile);
-                audioPlayer.src = currentAudioUrl;
-                console.log('Audio source set from local file');
-                
-                // Show player section and scroll to it
-                playerSection.style.display = 'block';
-                playerSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                
-                // Initialize audio player
-                await new Promise((resolve, reject) => {
-                    const handleCanPlay = () => {
-                        audioPlayer.removeEventListener('canplay', handleCanPlay);
-                        audioPlayer.removeEventListener('error', handleError);
-                        resolve();
-                    };
-                    
-                    const handleError = (e) => {
-                        audioPlayer.removeEventListener('canplay', handleCanPlay);
-                        audioPlayer.removeEventListener('error', handleError);
-                        reject(new Error('Failed to load audio file'));
-                    };
-                    
-                    audioPlayer.addEventListener('canplay', handleCanPlay);
-                    audioPlayer.addEventListener('error', handleError);
-                    
-                    audioPlayer.load();
-                });
-                
-                console.log('Audio player loaded successfully');
-                
-                // Try to play the audio
-                try {
-                    await audioPlayer.play();
-                } catch (error) {
-                    console.log('Auto-play prevented:', error);
-                    alert('Audio loaded but auto-play was blocked. Please click the play button to start playback.');
-                }
-                
-                renderSubtitles();
-                setupAudioListeners();
-                
-                // Hide file section
-                fileSection.style.display = 'none';
-                toggleFilesBtn.querySelector('span').textContent = '▼';
-            } catch (error) {
-                console.error('Error processing files:', error);
-                alert('Error processing files: ' + error.message);
-            }
-        });
-
-        // Add grouping input handler
-        groupingInput.addEventListener('change', () => {
-            groupingSeconds = Math.max(1, Math.min(60, parseInt(groupingInput.value) || 1));
-            groupingInput.value = groupingSeconds;
-            renderSubtitles();
-        });
-
-        function formatTime(timeStr) {
-            try {
-                // Handle SRT format (00:00:00,000)
-                const [hours, minutes, seconds] = timeStr.split(':');
-                const [secs] = seconds.split(',');
-                
-                // Convert all parts to numbers
-                const h = parseInt(hours) || 0;
-                const m = parseInt(minutes) || 0;
-                const s = parseInt(secs) || 0;
-                
-                // Format as HH:MM:SS
-                return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-            } catch (error) {
-                console.error('Error formatting time:', timeStr, error);
-                return timeStr;
-            }
-        }
-
-        function renderSubtitles() {
-            subtitleContainer.innerHTML = '';
-            
             // Group subtitles based on time window
             const groupedSubtitles = [];
             let currentGroup = [];
             let groupStartTime = null;
+            const groupingTime = parseFloat(groupingInput.value) || 1;
             
             subtitles.forEach((sub, index) => {
+                if (!sub || !sub.start || !sub.text) return;
+                
                 const startTime = timeToSeconds(sub.start);
                 
                 if (groupStartTime === null) {
                     groupStartTime = startTime;
-                    currentGroup.push(sub);
-                } else if (startTime - groupStartTime <= groupingSeconds) {
-                    currentGroup.push(sub);
+                    currentGroup = [{ ...sub, index }];
+                } else if (startTime - groupStartTime <= groupingTime) {
+                    currentGroup.push({ ...sub, index });
                 } else {
                     if (currentGroup.length > 0) {
                         groupedSubtitles.push({
-                            text: currentGroup.map(s => s.text).join(' '),
+                            text: currentGroup.map(s => s.text.trim()).join(' '),
                             start: currentGroup[0].start,
                             end: currentGroup[currentGroup.length - 1].end,
-                            indices: currentGroup.map(s => subtitles.indexOf(s))
+                            indices: currentGroup.map(s => s.index)
                         });
                     }
-                    currentGroup = [sub];
+                    currentGroup = [{ ...sub, index }];
                     groupStartTime = startTime;
                 }
             });
@@ -598,10 +499,10 @@
             // Add the last group if it exists
             if (currentGroup.length > 0) {
                 groupedSubtitles.push({
-                    text: currentGroup.map(s => s.text).join(' '),
+                    text: currentGroup.map(s => s.text.trim()).join(' '),
                     start: currentGroup[0].start,
                     end: currentGroup[currentGroup.length - 1].end,
-                    indices: currentGroup.map(s => subtitles.indexOf(s))
+                    indices: currentGroup.map(s => s.index)
                 });
             }
             
@@ -609,25 +510,29 @@
             groupedSubtitles.forEach((group, groupIndex) => {
                 const div = document.createElement('div');
                 div.className = 'subtitle-item';
+                div.dataset.startTime = timeToSeconds(group.start);
+                div.dataset.endTime = timeToSeconds(group.end);
+                div.dataset.groupIndex = groupIndex;
                 
-                const textSpan = document.createElement('span');
-                textSpan.className = 'text';
-                textSpan.textContent = group.text;
+                // Format timestamps without milliseconds
+                const startTime = group.start.split(',')[0];
+                const endTime = group.end.split(',')[0];
                 
-                const timeSpan = document.createElement('span');
-                timeSpan.className = 'timestamp';
-                timeSpan.textContent = formatTime(group.start);
+                div.innerHTML = `
+                    <div class="text">${group.text}</div>
+                    <div class="timestamp">${startTime} → ${endTime}</div>
+                `;
                 
-                div.appendChild(textSpan);
-                div.appendChild(timeSpan);
-                
-                // Click handler to seek to the first subtitle in the group
                 div.onclick = () => {
-                    const firstIndex = group.indices[0];
-                    seekToSubtitle(firstIndex);
+                    const startTime = timeToSeconds(group.start);
+                    if (audioPlayer && !isNaN(startTime)) {
+                        audioPlayer.currentTime = startTime;
+                        audioPlayer.play().catch(console.error);
+                        highlightCurrentSubtitle(groupIndex);
+                    }
                 };
                 
-                subtitleContainer.appendChild(div);
+                container.appendChild(div);
             });
         }
 
@@ -638,102 +543,72 @@
             });
         }
 
-        // Update the updateActiveSubtitle function to handle grouped subtitles
         function updateActiveSubtitle(currentTime) {
-            const subtitleElements = subtitleContainer.children;
-            
-            Array.from(subtitleElements).forEach(el => el.classList.remove('active'));
-            
-            // Find the group that contains the current time
-            const currentGroupIndex = Array.from(subtitleElements).findIndex(el => {
-                const start = timeToSeconds(el.querySelector('.timestamp').textContent);
-                const text = el.querySelector('.text').textContent;
-                // Find the last subtitle in this group by matching the last part of the text
-                const lastSubtitle = subtitles.find(s => text.endsWith(s.text));
-                const end = timeToSeconds(lastSubtitle?.end || subtitles[subtitles.length - 1].end);
-                return currentTime >= start && currentTime <= end;
+            const subtitleItems = document.querySelectorAll('.subtitle-item');
+            let activeFound = false;
+
+            subtitleItems.forEach((item) => {
+                const startTime = parseFloat(item.dataset.startTime);
+                const endTime = parseFloat(item.dataset.endTime);
+                const groupIndex = parseInt(item.dataset.groupIndex);
+
+                if (currentTime >= startTime && currentTime <= endTime) {
+                    if (!item.classList.contains('active')) {
+                        highlightCurrentSubtitle(groupIndex);
+                    }
+                    activeFound = true;
+                } else {
+                    item.classList.remove('active');
+                }
             });
 
-            if (currentGroupIndex !== -1) {
-                const currentGroup = subtitleElements[currentGroupIndex];
-                currentGroup.classList.add('active');
-                currentSubtitleIndex = currentGroupIndex;
-                
-                // Scroll to active subtitle if following text is enabled
+            // If following text is enabled and we found an active subtitle
+            if (isFollowingText && activeFound) {
+                const activeItem = document.querySelector('.subtitle-item.active');
+                if (activeItem) {
+                    activeItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }
+        }
+
+        function highlightCurrentSubtitle(index) {
+            const subtitleItems = document.querySelectorAll('.subtitle-item');
+            subtitleItems.forEach((item) => item.classList.remove('active'));
+            
+            const currentItem = subtitleItems[index];
+            if (currentItem) {
+                currentItem.classList.add('active');
                 if (isFollowingText) {
-                    currentGroup.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    currentItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 }
             }
         }
 
-        function timeToSeconds(timeStr) {
-            try {
-                // Handle SRT format (00:00:00,000)
-                const [hours, minutes, seconds] = timeStr.split(':');
-                const [secs, ms] = seconds.split(',');
-                
-                // Convert all parts to numbers
-                const h = parseInt(hours) || 0;
-                const m = parseInt(minutes) || 0;
-                const s = parseInt(secs) || 0;
-                const milliseconds = parseInt(ms) || 0;
-                
-                // Calculate total seconds
-                return h * 3600 + m * 60 + s + milliseconds / 1000;
-            } catch (error) {
-                console.error('Error converting time:', timeStr, error);
-                return 0;
-            }
-        }
-
-        function seekToSubtitle(index) {
-            try {
-                const startTime = timeToSeconds(subtitles[index].start);
-                if (isFinite(startTime)) {
-                    audioPlayer.currentTime = startTime;
-                    audioPlayer.play().catch(error => {
-                        console.log('Play prevented:', error);
-                    });
-                } else {
-                    console.error('Invalid time value:', subtitles[index].start);
-                }
-            } catch (error) {
-                console.error('Error seeking to subtitle:', error);
-            }
-        }
-
-        function seekForward(seconds) {
-            audioPlayer.currentTime = Math.min(audioPlayer.duration, audioPlayer.currentTime + seconds);
-        }
-
-        function seekBackward(seconds) {
-            audioPlayer.currentTime = Math.max(0, audioPlayer.currentTime - seconds);
-        }
-
-        // Add follow text toggle functionality
+        // Follow text button handler
         followTextBtn.addEventListener('click', () => {
             isFollowingText = !isFollowingText;
             followTextBtn.classList.toggle('active');
             followTextBtn.querySelector('span').textContent = isFollowingText ? 'Following Text' : 'Follow Text';
             
-            // If enabling follow text, scroll to current subtitle
-            if (isFollowingText && currentSubtitleIndex !== -1) {
-                const subtitleElements = subtitleContainer.children;
-                subtitleElements[currentSubtitleIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });
+            if (isFollowingText) {
+                const activeItem = document.querySelector('.subtitle-item.active');
+                if (activeItem) {
+                    activeItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
             }
         });
 
-        // Update the toggle button click handler
+        // Grouping input handler
+        groupingInput.addEventListener('change', () => {
+            groupingSeconds = Math.max(1, Math.min(60, parseInt(groupingInput.value) || 1));
+            groupingInput.value = groupingSeconds;
+            renderSubtitles();
+        });
+
+        // Toggle files button handler
         toggleFilesBtn.addEventListener('click', () => {
-            const toggleIcon = toggleFilesBtn.querySelector('span');
-            
-            if (fileSection.style.display === 'none') {
-                fileSection.style.display = 'block';
-                toggleIcon.textContent = '▲';
-            } else {
-                fileSection.style.display = 'none';
-                toggleIcon.textContent = '▼';
-            }
+            fileSection.style.display = fileSection.style.display === 'none' ? 'block' : 'none';
+            toggleFilesBtn.querySelector('span').textContent = fileSection.style.display === 'none' ? '▼' : '▲';
         });
     </script>
 </body>
