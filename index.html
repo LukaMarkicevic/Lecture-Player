@@ -5,13 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lecture Player</title>
     <link rel="icon" type="image/svg+xml" href="/static/icon.svg" style="background-color: white;">
-    <!-- Vercel Analytics -->
+    <!-- Vercel Analytics - Only load in production -->
     <script>
-        window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+        if (window.location.hostname === 'lectureplay.com') {
+            window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+            // Load analytics script with error handling
+            const script = document.createElement('script');
+            script.defer = true;
+            script.src = '/_vercel/insights/script.js';
+            script.setAttribute('data-domain', 'lectureplay.com');
+            script.onerror = () => console.log('Analytics script blocked or failed to load');
+            document.head.appendChild(script);
+        }
     </script>
-    <script defer src="/_vercel/insights/script.js" data-domain="lectureplay.com"></script>
-    <script src="index.js"></script>
-    <link rel="stylesheet" href="index.css">
+    <script defer src="index.js"></script>
+    <link rel="stylesheet" type="text/css" href="index.css">
 </head>
 <body>
     <div class="container">

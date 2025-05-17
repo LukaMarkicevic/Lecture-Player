@@ -2,10 +2,14 @@
     "version": 2,
     "builds": [
         { "src": "*.html", "use": "@vercel/static" },
+        { "src": "*.js", "use": "@vercel/static" },
+        { "src": "*.css", "use": "@vercel/static" },
         { "src": "static/**", "use": "@vercel/static" }
     ],
     "routes": [
         { "src": "/static/(.*)", "dest": "/static/$1" },
+        { "src": "/(.*)\\.js$", "headers": { "content-type": "application/javascript" } },
+        { "src": "/(.*)\\.css$", "headers": { "content-type": "text/css" } },
         { "src": "/(.*)", "dest": "/index.html" }
     ]
 } 
