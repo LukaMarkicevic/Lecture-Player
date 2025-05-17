@@ -12,7 +12,7 @@
     <style>
         body {
             font-family: Arial, sans-serif;
-            max-width: 1000px;
+            max-width: 100%;
             margin: 0 auto;
             padding: 20px;
             background-color: #f5f5f5;
@@ -22,6 +22,12 @@
             padding: 30px;
             border-radius: 12px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            max-width: 1000px;
+            margin: 0 auto;
+            transition: max-width 0.3s ease;
+        }
+        .container.video-mode {
+            max-width: 1800px;
         }
         .header-container {
             display: flex;
@@ -99,6 +105,28 @@
             display: flex;
             flex-direction: column;
             gap: 20px;
+        }
+        .player-container.video-mode {
+            flex-direction: row;
+            align-items: flex-start;
+            gap: 20px;
+            max-width: 100%;
+        }
+        .player-container.video-mode .media-section {
+            flex: 1.2;
+            min-width: 0;
+        }
+        .player-container.video-mode .subtitle-section {
+            flex: 0.8;
+            min-width: 0;
+            height: 70vh;
+            margin-top: 0;
+        }
+        #videoPlayer {
+            width: 100%;
+            max-height: 70vh;
+            background-color: #000;
+            border-radius: 8px;
         }
         #audioPlayer {
             width: 100%;
@@ -339,12 +367,22 @@
             }
         }
         @media (max-width: 900px) {
-            .player-section {
+            body {
+                padding: 10px;
+            }
+            .container {
+                padding: 15px;
+            }
+            .player-container.video-mode {
                 flex-direction: column;
             }
-            .player-left, .player-right {
-                max-width: 100%;
-                min-width: 0;
+            .player-container.video-mode .media-section,
+            .player-container.video-mode .subtitle-section {
+                width: 100%;
+                flex: 1;
+            }
+            .player-container.video-mode .subtitle-section {
+                height: 50vh;
             }
         }
     </style>
@@ -367,12 +405,12 @@
             <h2>Select Files</h2>
             <div class="upload-boxes">
                 <div class="upload-box">
-                    <label for="audio">
-                        <div class="icon">🎙️</div>
-                        <h3>Audio File</h3>
-                        <p>Select your audio file (MP3, M4A, WAV, OGG)</p>
-                        <div id="audioFileName" class="selected-file"></div>
-                        <input type="file" id="audio" accept=".mp3,.m4a,.wav,.ogg">
+                    <label for="media">
+                        <div class="icon">🎬</div>
+                        <h3>Media File</h3>
+                        <p>Select your audio (MP3, M4A, WAV, OGG) or video file (MP4, MKV)</p>
+                        <div id="mediaFileName" class="selected-file"></div>
+                        <input type="file" id="media" accept=".mp3,.m4a,.wav,.ogg,.mp4,.mkv">
                     </label>
                 </div>
                 <div class="upload-box">
@@ -394,26 +432,31 @@
 
         <div class="player-section" style="display: none;">
             <div class="player-container">
-                <audio id="audioPlayer" controls></audio>
-                <div class="controls">
-                    <div class="controls-group">
-                        <button id="followTextBtn">
-                            <span>Follow Text</span>
-                        </button>
-                        <button id="toggleFilesBtn">
-                            <span>▲</span>
-                        </button>
-                    </div>
-                    <div class="grouping-control">
-                        <label for="groupingSeconds">Grouping:</label>
-                        <input type="number" id="groupingSeconds" min="1" max="60" value="1">
-                        <span>seconds</span>
-                    </div>
-                    <div class="search-control">
-                        <input type="text" id="searchInput" placeholder="Search subtitles...">
+                <div class="media-section">
+                    <video id="videoPlayer" controls style="display: none;"></video>
+                    <audio id="audioPlayer" controls style="display: none;"></audio>
+                    <div class="controls">
+                        <div class="controls-group">
+                            <button id="followTextBtn">
+                                <span>Follow Text</span>
+                            </button>
+                            <button id="toggleFilesBtn">
+                                <span>▲</span>
+                            </button>
+                        </div>
+                        <div class="grouping-control">
+                            <label for="groupingSeconds">Grouping:</label>
+                            <input type="number" id="groupingSeconds" min="1" max="60" value="1">
+                            <span>seconds</span>
+                        </div>
+                        <div class="search-control">
+                            <input type="text" id="searchInput" placeholder="Search subtitles...">
+                        </div>
                     </div>
                 </div>
-                <div class="subtitle-container" id="subtitleContainer"></div>
+                <div class="subtitle-section">
+                    <div class="subtitle-container" id="subtitleContainer"></div>
+                </div>
             </div>
         </div>
     </div>
@@ -422,6 +465,7 @@
         let subtitles = [];
         let currentSubtitleIndex = -1;
         const audioPlayer = document.getElementById('audioPlayer');
+        const videoPlayer = document.getElementById('videoPlayer');
         const subtitleContainer = document.getElementById('subtitleContainer');
         const playerSection = document.querySelector('.player-section');
         const startButton = document.getElementById('startButton');
@@ -431,19 +475,20 @@
         const toggleFilesBtn = document.getElementById('toggleFilesBtn');
         let groupingSeconds = 1;
         const groupingInput = document.getElementById('groupingSeconds');
+        let currentPlayer = null;
 
         // Update button state based on file selection
         function updateUploadButton() {
-            const audioFile = document.getElementById('audio').files[0];
+            const mediaFile = document.getElementById('media').files[0];
             const subtitleFile = document.getElementById('subtitle').files[0];
-            const audioFileName = document.getElementById('audioFileName');
+            const mediaFileName = document.getElementById('mediaFileName');
             const subtitleFileName = document.getElementById('subtitleFileName');
             
-            if (audioFile) {
-                audioFileName.textContent = audioFile.name;
-                audioFileName.style.display = 'block';
+            if (mediaFile) {
+                mediaFileName.textContent = mediaFile.name;
+                mediaFileName.style.display = 'block';
             } else {
-                audioFileName.style.display = 'none';
+                mediaFileName.style.display = 'none';
             }
             
             if (subtitleFile) {
@@ -453,12 +498,12 @@
                 subtitleFileName.style.display = 'none';
             }
             
-            startButton.disabled = !(audioFile && subtitleFile);
+            startButton.disabled = !(mediaFile && subtitleFile);
             startButton.style.opacity = startButton.disabled ? '0.5' : '1';
         }
 
         // Handle file uploads
-        document.getElementById('audio').addEventListener('change', updateUploadButton);
+        document.getElementById('media').addEventListener('change', updateUploadButton);
         document.getElementById('subtitle').addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
@@ -478,11 +523,30 @@
 
         // Start button click handler
         startButton.addEventListener('click', async () => {
-            const audioFile = document.getElementById('audio').files[0];
-            if (!audioFile) return;
+            const mediaFile = document.getElementById('media').files[0];
+            if (!mediaFile) return;
             
-            const audioURL = URL.createObjectURL(audioFile);
-            audioPlayer.src = audioURL;
+            const mediaURL = URL.createObjectURL(mediaFile);
+            const isVideo = mediaFile.type.startsWith('video/');
+            
+            // Hide both players initially
+            audioPlayer.style.display = 'none';
+            videoPlayer.style.display = 'none';
+            
+            // Set up the appropriate player
+            if (isVideo) {
+                videoPlayer.src = mediaURL;
+                videoPlayer.style.display = 'block';
+                currentPlayer = videoPlayer;
+                document.querySelector('.player-container').classList.add('video-mode');
+                document.querySelector('.container').classList.add('video-mode');
+            } else {
+                audioPlayer.src = mediaURL;
+                audioPlayer.style.display = 'block';
+                currentPlayer = audioPlayer;
+                document.querySelector('.player-container').classList.remove('video-mode');
+                document.querySelector('.container').classList.remove('video-mode');
+            }
             
             playerSection.style.display = 'block';
             playerSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -492,9 +556,9 @@
             
             if (subtitles && subtitles.length > 0) {
                 renderSubtitles();
-                setupAudioListeners();
+                setupMediaListeners();
                 // Start playing automatically
-                audioPlayer.play().catch(error => {
+                currentPlayer.play().catch(error => {
                     console.log('Autoplay prevented:', error);
                 });
             }
@@ -628,9 +692,9 @@
                 
                 div.onclick = () => {
                     const startTime = timeToSeconds(group.start);
-                    if (audioPlayer && !isNaN(startTime)) {
-                        audioPlayer.currentTime = startTime;
-                        audioPlayer.play().catch(console.error);
+                    if (currentPlayer && !isNaN(startTime)) {
+                        currentPlayer.currentTime = startTime;
+                        currentPlayer.play().catch(console.error);
                         highlightCurrentSubtitle(groupIndex);
                     }
                 };
@@ -639,9 +703,9 @@
             });
         }
 
-        function setupAudioListeners() {
-            audioPlayer.addEventListener('timeupdate', () => {
-                const currentTime = audioPlayer.currentTime;
+        function setupMediaListeners() {
+            currentPlayer.addEventListener('timeupdate', () => {
+                const currentTime = currentPlayer.currentTime;
                 updateActiveSubtitle(currentTime);
             });
         }
