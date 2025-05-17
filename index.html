@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lecture Player</title>
     <link rel="icon" type="image/svg+xml" href="/static/icon.svg" style="background-color: white;">
+    <script>
+        window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+    </script>
+    <script defer src="/_vercel/insights/script.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -86,47 +90,29 @@
         }
         .player-section {
             margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
         }
-        audio {
+        .player-container {
             width: 100%;
-            margin-bottom: 20px;
-            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        #audioPlayer {
+            width: 100%;
+            height: 40px;
         }
         .subtitle-container {
-            max-height: 400px;
+            min-height: 500px;
+            height: 60vh;
             overflow-y: auto;
             padding: 15px;
             border: 1px solid #eee;
             border-radius: 8px;
             background-color: #fafafa;
-        }
-        .subtitle-item {
-            padding: 12px;
-            margin: 8px 0;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: all 0.2s;
-            background-color: white;
-            border: 1px solid #eee;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-        .subtitle-item .text {
-            flex: 1;
-        }
-        .subtitle-item .timestamp {
-            color: #666;
-            font-size: 0.9em;
-            white-space: nowrap;
-        }
-        .subtitle-item:hover {
-            background-color: #f0f0f0;
-            transform: translateX(5px);
-        }
-        .subtitle-item.active {
-            background-color: #e3f2fd;
-            border-color: #2196f3;
+            resize: vertical;
         }
         .controls {
             display: flex;
@@ -255,6 +241,58 @@
             align-items: center;
             gap: 10px;
         }
+        .search-control {
+            display: flex;
+            align-items: center;
+            background-color: #f8f9fa;
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid #e0e0e0;
+            flex: 1;
+            max-width: 300px;
+        }
+        .search-control input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .subtitle-item.highlight {
+            background-color: #fff3cd;
+            border-color: #ffeeba;
+        }
+        .subtitle-item.hidden {
+            display: none;
+        }
+        .subtitle-item {
+            padding: 12px;
+            margin: 8px 0;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            background-color: white;
+            border: 1px solid #eee;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .subtitle-item .text {
+            flex: 1;
+        }
+        .subtitle-item .timestamp {
+            color: #666;
+            font-size: 0.9em;
+            white-space: nowrap;
+        }
+        .subtitle-item:hover {
+            background-color: #f0f0f0;
+            transform: translateX(5px);
+        }
+        .subtitle-item.active {
+            background-color: #e3f2fd;
+            border-color: #2196f3;
+        }
         @media (max-width: 768px) {
             body {
                 padding: 10px;
@@ -298,6 +336,15 @@
             }
             .subtitle-item .timestamp {
                 align-self: flex-start;
+            }
+        }
+        @media (max-width: 900px) {
+            .player-section {
+                flex-direction: column;
+            }
+            .player-left, .player-right {
+                max-width: 100%;
+                min-width: 0;
             }
         }
     </style>
@@ -346,25 +393,28 @@
         </div>
 
         <div class="player-section" style="display: none;">
-            <audio id="audioPlayer" controls></audio>
-            
-            <div class="controls">
-                <div class="controls-group">
-                    <button id="followTextBtn">
-                        <span>Follow Text</span>
-                    </button>
-                    <button id="toggleFilesBtn">
-                        <span>▲</span>
-                    </button>
+            <div class="player-container">
+                <audio id="audioPlayer" controls></audio>
+                <div class="controls">
+                    <div class="controls-group">
+                        <button id="followTextBtn">
+                            <span>Follow Text</span>
+                        </button>
+                        <button id="toggleFilesBtn">
+                            <span>▲</span>
+                        </button>
+                    </div>
+                    <div class="grouping-control">
+                        <label for="groupingSeconds">Grouping:</label>
+                        <input type="number" id="groupingSeconds" min="1" max="60" value="1">
+                        <span>seconds</span>
+                    </div>
+                    <div class="search-control">
+                        <input type="text" id="searchInput" placeholder="Search subtitles...">
+                    </div>
                 </div>
-                <div class="grouping-control">
-                    <label for="groupingSeconds">Grouping:</label>
-                    <input type="number" id="groupingSeconds" min="1" max="60" value="1">
-                    <span>seconds</span>
-                </div>
+                <div class="subtitle-container" id="subtitleContainer"></div>
             </div>
-
-            <div class="subtitle-container" id="subtitleContainer"></div>
         </div>
     </div>
 
@@ -662,6 +712,52 @@
         toggleFilesBtn.addEventListener('click', () => {
             fileSection.style.display = fileSection.style.display === 'none' ? 'block' : 'none';
             toggleFilesBtn.querySelector('span').textContent = fileSection.style.display === 'none' ? '▼' : '▲';
+        });
+
+        // Search functionality
+        const searchInput = document.getElementById('searchInput');
+        let searchTimeout;
+
+        searchInput.addEventListener('input', (e) => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                const searchTerm = e.target.value.toLowerCase().trim();
+                const subtitleItems = document.querySelectorAll('.subtitle-item');
+                
+                subtitleItems.forEach(item => {
+                    const text = item.querySelector('.text').textContent.toLowerCase();
+                    const timestamp = item.querySelector('.timestamp').textContent.toLowerCase();
+                    
+                    // Remove previous highlights
+                    item.classList.remove('highlight');
+                    
+                    if (searchTerm === '') {
+                        // If search is empty, show all items
+                        item.classList.remove('hidden');
+                    } else if (text.includes(searchTerm) || timestamp.includes(searchTerm)) {
+                        // Show and highlight matching items
+                        item.classList.remove('hidden');
+                        item.classList.add('highlight');
+                        
+                        // If following text is enabled, scroll to the first match
+                        if (isFollowingText && !item.classList.contains('active')) {
+                            item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                    } else {
+                        // Hide non-matching items
+                        item.classList.add('hidden');
+                    }
+                });
+            }, 300); // Debounce search for better performance
+        });
+
+        // Clear search when starting new playback
+        startButton.addEventListener('click', () => {
+            searchInput.value = '';
+            const subtitleItems = document.querySelectorAll('.subtitle-item');
+            subtitleItems.forEach(item => {
+                item.classList.remove('highlight', 'hidden');
+            });
         });
     </script>
 </body>
