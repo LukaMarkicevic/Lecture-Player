@@ -377,3 +377,82 @@ button:hover {
         height: 50vh;
     }
 }
+
+/* Soft, Integrated Banner Ad Styles */
+.banner-ad {
+    margin-right: 10px;
+    display: inline-block;
+}
+
+.banner-ad a {
+    text-decoration: none;
+    color: inherit;
+}
+
+.banner-content {
+    background-color: #ffe3e3;
+    border-radius: 10px;
+    padding: 10px 18px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 160px;
+    box-shadow: 0 2px 8px 0 rgba(0,0,0,0.06);
+    height: 48px;
+    transition: box-shadow 0.2s, transform 0.2s;
+}
+
+.banner-content:hover {
+    box-shadow: 0 4px 16px 0 rgba(0,0,0,0.10);
+    transform: translateY(-2px);
+}
+
+.banner-icon {
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    /* No fill or stroke overrides, use original SVG colors */
+}
+
+.banner-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.banner-headline {
+    font-family: Arial, Segoe UI, sans-serif;
+    color: #c14444;
+    font-weight: 600;
+    font-size: 15px;
+    line-height: 1.1;
+    margin-bottom: 2px;
+    /* No outline or shadow */
+}
+
+.banner-subtitle {
+    font-family: Arial, Segoe UI, sans-serif;
+    color: #444;
+    font-weight: 400;
+    font-size: 12px;
+    opacity: 0.85;
+    line-height: 1;
+}
+
+@media (max-width: 768px) {
+    .banner-content {
+        min-width: 120px;
+        padding: 8px 10px;
+        height: 40px;
+    }
+    .banner-icon {
+        width: 18px;
+        height: 18px;
+    }
+    .banner-headline {
+        font-size: 13px;
+    }
+    .banner-subtitle {
+        font-size: 11px;
+    }
+}
