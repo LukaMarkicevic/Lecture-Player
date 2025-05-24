@@ -378,13 +378,13 @@ button:hover {
     }
 }
 
-/* Soft, Integrated Banner Ad Styles */
-.banner-ad {
+/* Soft, Integrated SimpleSub Promo Styles */
+.simplesub-promo {
     margin-right: 10px;
     display: inline-block;
 }
 
-.banner-ad a {
+.simplesub-promo a {
     text-decoration: none;
     color: inherit;
 }
