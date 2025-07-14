@@ -93,6 +93,13 @@ startButton.addEventListener('click', async () => {
     if (subtitles && subtitles.length > 0) {
         renderSubtitles();
         setupMediaListeners();
+        
+        // Apply current speed setting to the new player
+        const currentSpeed = parseFloat(playbackSpeedSelect.value);
+        if (!isNaN(currentSpeed)) {
+            currentPlayer.playbackRate = currentSpeed;
+        }
+        
         // Start playing automatically
         currentPlayer.play().catch(error => {
             console.log('Autoplay prevented:', error);
@@ -306,6 +313,15 @@ groupingInput.addEventListener('change', () => {
     groupingSeconds = Math.max(1, Math.min(60, parseInt(groupingInput.value) || 1));
     groupingInput.value = groupingSeconds;
     renderSubtitles();
+});
+
+// Speed control handler
+const playbackSpeedSelect = document.getElementById('playbackSpeed');
+playbackSpeedSelect.addEventListener('change', () => {
+    const speed = parseFloat(playbackSpeedSelect.value);
+    if (currentPlayer && !isNaN(speed)) {
+        currentPlayer.playbackRate = speed;
+    }
 });
 
 // Toggle files button handler

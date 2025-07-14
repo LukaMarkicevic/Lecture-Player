@@ -158,6 +158,22 @@ body {
     border: 1px solid #ddd;
     border-radius: 4px;
 }
+.speed-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background-color: #f8f9fa;
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid #e0e0e0;
+}
+.speed-control select {
+    padding: 4px 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: white;
+    cursor: pointer;
+}
 button {
     padding: 10px 20px;
     border: none;
@@ -344,6 +360,10 @@ button:hover {
         justify-content: center;
     }
     .grouping-control {
+        flex: 1;
+        justify-content: center;
+    }
+    .speed-control {
         flex: 1;
         justify-content: center;
     }
